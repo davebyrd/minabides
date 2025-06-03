@@ -68,9 +68,10 @@ def simulate (sim, model, date, trip, mode, ag_start, end, base_ag, learn_ag, ar
 
     # Initialize log header on first simulation.
     if sim == 0:
+        ### TEMP HACK: fund to book log
         log_header(simulate.book_log,  ['time'] + [ f'{a}_{i}_{p}' for i in range(args.levels)
                                                     for a in ['ask','bid'] for p in ['p','q'] ] +
-                                       ['trade_price','trade_quantity'])
+                                       ['trade_price','trade_quantity','fundamental'])
         log_header(simulate.loss_log,  ['episode','episode_step','global_step','actor_loss','critic_loss'])
         log_header(simulate.perf_log,  ['mps','profit'])
 

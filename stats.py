@@ -87,6 +87,8 @@ parser.add_argument('-e', '--exp', required=True, metavar='EXP_RESULTS_PATH',
                     help='Path to experimental results (with raw logs)')
 parser.add_argument('-l', '--logs', nargs='+', default=['book','loss','perf'], metavar='LOG_NAMES',
                     help='Process and report/plot only these kinds of logs.')
+parser.add_argument('-n', '--every_n', default=1, metavar='BOOK_EVERY_N',
+                    help='For book plot, use every Nth update (i.e. lower the frequency for the plot).')
 parser.add_argument('-x', '--x_var', default=None, metavar='COLUMN_NAME',
                     help='This column will be the x-axis of each plot.  The y-axis is always profit.  '
                          'Affects plot only.  Optional but usually recommended.')
@@ -113,6 +115,9 @@ if 'perf' in args.logs:
     # Print stats distribution grouped by requested columns, showing profit.
     # Usually want to include mode to avoid mixing training and testing results.
     print(df_perf.groupby(args.columns)['profit'].describe())
+
+    # Write the same information to a CSV in the analysis directory.
+    df_perf.groupby(args.columns)['profit'].describe().to_csv(os.path.join(outdir, "stats.csv"))
 
     # Decide which columns to assign to which plot attributes.
     cols = args.columns
@@ -180,6 +185,9 @@ if 'book' in args.logs:
     levels = df['levels'].iloc[0]
     has_is_test = df['mode'].isin(['test_is']).any()
     df_plot = df.loc[df['mode'] == 'test_is'] if has_is_test else df.loc[df['sim'] == 0]
+
+    ### If requested, resample frequency of book snapshots.
+    df_plot = df_plot.iloc[::int(args.every_n)]
     
     ### Plot asks.
     cols = [ f'ask_{i}_p' for i in range(levels) ]
@@ -192,6 +200,9 @@ if 'book' in args.logs:
     ### Plot last trade price.
     ax = (df_plot['trade_price']/100).plot(ax=ax, color='black')
     
+    ### Plot fundamental.
+    ax = (df_plot['fundamental']/100).plot(ax=ax, color='black', linestyle=':')
+
     ### Make the plot more attractive.
     hms_only = mdates.DateFormatter('%H:%M:%S')
     ax.xaxis.set_major_formatter(hms_only)

@@ -46,7 +46,11 @@ class ExchangeAgent(Agent):
         if order.aid < 0 and 'fund' in msg: book.fund = msg['fund']
 
         # Handle the order
-        if mtype == 'place':
+        ### TEMP HACK: allow 'fund' mytype that only updates fundamental and nothing else.
+        if mtype == 'fund':
+            pass
+
+        elif mtype == 'place':
             matching = True
 
             while matching:

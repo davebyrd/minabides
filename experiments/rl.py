@@ -129,11 +129,11 @@ def experiment(base_args, exp_args):
     # "Base" agents are those always present for this experiment.
 
     base_ag = [ ExchangeAgent([args.symbol], args) ] + \
-              [ MarketMakerAgent(args.symbol, 1e1, 2e8, 100) for i in range(args.bg_mkt)] + \
+              [ MarketMakerAgent(args.symbol, 1e1, 1e8, 100) for i in range(args.bg_mkt)] + \
               [ MomentumAgent(args.symbol, 5e6, 1e9, 100) for i in range(args.bg_mom)] + \
-              [ NoiseAgent(args.symbol, 12e6, 10e9) for i in range(args.bg_nse)] + \
+              [ NoiseAgent(args.symbol, 12e6, 1e9) for i in range(args.bg_nse)] + \
               [ OrderBookImbalanceAgent(args.symbol, 1e3, 2e8, 100, 50) for i in range(args.bg_obi)] + \
-              [ ValueAgent(args.symbol, 3e6, 5e8, 100) for i in range(args.bg_val)]
+              [ ValueAgent(args.symbol, 3e6, 1e9, 100) for i in range(args.bg_val)]
 
     # Configure the learning agents for the experiment.  They are separated out
     # because only one is included in each simulated day.  (args.models models

@@ -19,9 +19,10 @@ class MomentumAgent(TradingAgent):
         super().message(ct, msg)
         if msg['type'] == 'lob':
             # Momentum agents place market orders based on recent price trend.
+            # TO DO: Adapt to volatility?
             if len(self.prevmids) >= self.n_pm:
                 delta = self.mid - mean(self.prevmids)
-                if abs(delta) < 5: delta = 0
+                if abs(delta) < 1: delta = 0
                 q = self.lot * sign(delta)
                 for m in self.adjust(q): yield m
 
@@ -34,6 +35,7 @@ class MarketMakerAgent(TradingAgent):
     def __init__ (self, symbol, minlat, interval, lot):
         super().__init__(symbol, minlat, interval, lot=lot, offset=1e9)
         self.done = False
+        #self.debug = True
 
     def message (self, ct, msg):
         super().message(ct, msg)
@@ -41,14 +43,20 @@ class MarketMakerAgent(TradingAgent):
             # Market maker agents cancel existing orders and place new ones near the mid.
             # Implementation option one: actually cancel and replace.  Slows simulation a bit.
             # Consider adding exchange "ladder" functionality to remove slowdown.
-            for x in self.cancel_all(): yield x
-            for i in range(4): yield self.place(self.lot, self.bid - i)
-            for i in range(4): yield self.place(-self.lot, self.ask + i)
+            #to_cancel = self.cancel_all()
+            #for x in self.cancel_all(): yield x
+            #for i in range(4): yield self.place(self.lot, self.bid - i)
+            #for i in range(4): yield self.place(-self.lot, self.ask + i)
+            #for i in range(4): yield self.place(self.lot, int(self.mid) - i - 1)
+            #for i in range(4): yield self.place(-self.lot, int(self.mid) + i + 1)
+            #for x in to_cancel: yield x
 
             # Implementation option two: Submit orders that expire about the time our next
             #                            orders should arrive.  Lower impact on simulation speed.
-            #for i in range(4): yield self.place(self.lot, self.bid - i, exp=ct+1e6+2e3)
-            #for i in range(4): yield self.place(-self.lot, self.ask + i, exp=ct+1e6+2e3)
+            #for i in range(4): yield self.place(self.lot, self.bid - i, exp=ct+1e8+1e7)
+            #for i in range(4): yield self.place(-self.lot, self.ask + i, exp=ct+1e8+1e7)
+            for i in range(4): yield self.place(self.lot, int(self.mid) - i - 1, exp=ct+1e8+1e3)
+            for i in range(4): yield self.place(-self.lot, int(self.mid) + i + 1, exp=ct+1e8+1e3)
 
 
 class NoiseAgent(TradingAgent):
@@ -67,6 +75,46 @@ class NoiseAgent(TradingAgent):
             # Noise agents don't see fund.  They place random orders near the current mid.
             q = randint(50,150) * (1 if random() < 0.5 else -1)
             p = int(self.mid + gauss() * 100)
+            yield self.place(q,p)
+
+
+class OrderBookImbalanceAgent(TradingAgent):
+    """ A low-latency trading agent that follows an order book imbalance indicator. """
+
+    def __init__ (self, symbol, minlat, interval, lot, levels, tag=''):
+        super().__init__(symbol, minlat, interval, lot=lot, tag=tag, offset=1e9)
+        self.levels = levels
+
+    def message (self, ct, msg):
+        super().message(ct, msg)
+        if msg['type'] == 'lob':
+            # OBI agents place orders based on volume imbalance weighted by
+            # distance from the mid-price.
+            b, a, fac = 0, 0, 1.0
+            for x in to_cancel: yield x
+
+            # Implementation option two: Submit orders that expire about the time our next
+            #                            orders should arrive.  Lower impact on simulation speed.
+            #for i in range(4): yield self.place(self.lot, self.bid - i, exp=ct+2e8)
+            #for i in range(4): yield self.place(-self.lot, self.ask + i, exp=ct+2e8)
+
+
+class NoiseAgent(TradingAgent):
+    """ Simple noise agent that places random orders. """
+
+    # To improve speed, the noise agent could place orders ahead as the history agent does.
+    # It could also act as any number of uninformed participants.
+
+    def __init__ (self, symbol, minlat, interval):
+        super().__init__(symbol, minlat, interval, offset=6e10)
+        self.done = False
+
+    def message (self, ct, msg):
+        super().message(ct, msg)
+        if msg['type'] == 'lob':
+            # Noise agents don't see fund.  They place random orders near the current mid.
+            q = randint(50,150) * (1 if random() < 0.5 else -1)
+            p = int(self.mid + gauss() * 5)
             yield self.place(q,p)
 
 
@@ -130,15 +178,26 @@ class ValueAgent(TradingAgent):
 
             # Simple value agent updates belief, then arbs towards belief.
             # Consider changing scale of noise with price level.
-            if self.priv is None: self.priv = int(fund + gauss()*100)
-            else: self.priv += int(self.alpha * ((fund + gauss()*100) - self.priv))
+            #if self.priv is None: self.priv = int(fund + gauss()*5)
+            #else: self.priv += int(self.alpha * ((fund + gauss()*5) - self.priv))
+            self.priv = int(fund + gauss()*5)
 
             # Only trade if mid -> priv movement would be at least surplus.
             # Consider changing from mid to price-to-pay (best bid or ask).
             # Right now these are liquidity takers.  Could be providers.
             delta = self.priv - self.mid
-            if abs(delta) < self.surplus: q = 0
+            if delta == 0: return      # current mid-price exactly private valuation
             else: q = self.lot * sign(delta)
+            #if abs(delta) < self.surplus: q = 0
+            #else: q = self.lot * sign(delta)
 
-            for m in self.adjust(q, None): yield m
+            # 1/3 limit top of book, 1/3 limit bid-ask mid, 1/3 market order
+            #print(f"{ft(ct)}: fund {fund}, priv {self.priv}, mid {self.mid}, delta {delta}, q {q}")
+            orand = random()
+            if orand < 0.333:
+                if q < 0: yield self.place(q, self.ask)              # selling at best ask
+                else:     yield self.place(q, self.bid)              # buying at best bid
+            elif orand < 0.666: yield self.place(q, int(self.mid))   # buy/sell at mid-price
+            else: yield self.place(q)                                # buy/sell at market
+            #for m in self.adjust(q, None): yield m
 

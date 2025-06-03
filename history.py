@@ -48,6 +48,7 @@ class History:
     def history (self, et):
         """ Generator that will yield (delivery time, msg) orders for the exchange.
             et is end time for the current history queueing. """
+        ### TEMP HACK: only set fundamental.
 
         while True:
             if self.next is None: break
@@ -59,7 +60,9 @@ class History:
             # During history replay, fundamental is simply the most recently
             # executed real-world trade (not simulated market).
             # Could change to bayesian VWAP of executed trades or similar.
-            if n[1] in (4,5): self.fund = n[4]
+            #TEMP HACK: FUND ALWAYS $100
+            #if n[1] in (4,5): self.fund = n[4]
+            if n[1] in (4,5): self.fund = 10000
 
             otype = 'place'
             if n[1] == 2: otype = 'reduce'
@@ -74,7 +77,9 @@ class History:
             #if n[1] == 5: otype = 'ignore'    # needed if trying to match lobster LOB
 
             # Yield the next requested historical order and continue until requested end time.
-            yield n[0], { 'type': otype, 'fund': self.fund, 'order': o }
+            #yield n[0], { 'type': otype, 'fund': self.fund, 'order': o }
+            ### TEMP HACK: set fundamental only
+            yield n[0], { 'type': 'fund', 'fund': self.fund, 'order': o }
             self.next = self.get_next()
 
     def fast_forward (self, et):
@@ -95,7 +100,9 @@ class History:
             n = self.next
             if n[0] >= et: break
     
-            if n[1] == 4: book.fund = n[4]
+            # TEMP HACK: fund always 100
+            #if n[1] == 4: book.fund = n[4]
+            if n[1] == 4: book.fund = 10000
             o = Order(-1, n[3] if n[5] > 0 else -n[3], self.symbol, n[4], oid = n[2])
     
             if n[1] in [1,2,3,4]: book.ct = n[0]    # update book's last order time

@@ -197,7 +197,10 @@ class OrderBook:
         for book, snap in zip([self.book['ask'],self.book['bid']],[self.snap['ask'],self.snap['bid']]):
             if not book: continue
 
+            booklen = len(book[0])
             book[0] = [ x for x in book[0] if x.exp is None or x.exp > self.ct ]
+            dropped = booklen - len(book[0])
+            #if dropped > 0: print (f"Dropped {dropped} expired orders.")
             if book[0]: snap[0].quantity = sum([ abs(x.quantity) for x in book[0] ])
             else: del book[0], snap[0]
     
@@ -243,7 +246,8 @@ class OrderBook:
         """ Return the order book snapshot waiting to be logged, if any. """
         if self.book_to_log is None: return None
 
-        to_log = self.book_to_log + self.last_trade
+        ### TEMP HACK: add fund
+        to_log = self.book_to_log + self.last_trade + [self.fund]
         self.book_to_log = None
         return to_log
 
